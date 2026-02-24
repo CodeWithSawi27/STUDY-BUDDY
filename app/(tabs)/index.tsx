@@ -4,6 +4,7 @@ import BottomSheet, {
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import * as Haptics from "expo-haptics";
+import { useRouter } from "expo-router"; // Added useRouter
 import React, {
   useCallback,
   useEffect,
@@ -27,13 +28,14 @@ import { auth } from "../../lib/firebase";
 import { groupService } from "../../services/groupService";
 
 export default function Dashboard() {
+  const router = useRouter(); // Initialize router
   const [groups, setGroups] = useState<any[]>([]);
   const [filteredGroups, setFilteredGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<"create" | "join">("create");
 
-  // Bottom Sheet Ref
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ["60%"], []);
 
@@ -43,14 +45,13 @@ export default function Dashboard() {
     reset,
     formState: { errors },
   } = useForm({
-    defaultValues: { name: "", description: "" },
+    defaultValues: { name: "", description: "", inviteCode: "" },
   });
 
   useEffect(() => {
     fetchGroups();
   }, []);
 
-  // Filter logic
   useEffect(() => {
     const filtered = groups.filter((g) =>
       g.name.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -63,8 +64,7 @@ export default function Dashboard() {
     if (userId) {
       const { data, error } = await groupService.getUserGroups(userId);
       if (!error && data) {
-        const mappedData = data.map((item: any) => item.study_groups);
-        setGroups(mappedData);
+        setGroups(data.map((item: any) => item.study_groups));
       }
     }
     setLoading(false);
@@ -76,21 +76,34 @@ export default function Dashboard() {
     fetchGroups();
   };
 
-  const handleOpenModal = () => {
+  const handleOpenModal = (tab: "create" | "join") => {
+    setActiveTab(tab);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     bottomSheetRef.current?.expand();
   };
 
-  const onCreateGroup = async (data: { name: string; description: string }) => {
+  const onCreateGroup = async (data: any) => {
     const userId = auth.currentUser?.uid;
     if (!userId) return;
-
     const { error } = await groupService.createGroup(
       data.name,
       data.description,
       userId,
     );
+    handleResponse(error, "Group Created!");
+  };
 
+  const onJoinGroup = async (data: any) => {
+    const userId = auth.currentUser?.uid;
+    if (!userId) return;
+    const { error } = await groupService.joinGroupByCode(
+      data.inviteCode,
+      userId,
+    );
+    handleResponse(error, "Joined Group!");
+  };
+
+  const handleResponse = (error: any, successMsg: string) => {
     if (error) {
       Alert.alert("Error", error);
     } else {
@@ -99,10 +112,10 @@ export default function Dashboard() {
       Keyboard.dismiss();
       reset();
       fetchGroups();
+      Alert.alert("Success", successMsg);
     }
   };
 
-  // Custom Backdrop for the Apple-style dimming effect
   const renderBackdrop = useCallback(
     (props: any) => (
       <BottomSheetBackdrop
@@ -114,17 +127,26 @@ export default function Dashboard() {
     [],
   );
 
-  if (loading) return <ActivityIndicator className="flex-1" color="#6366F1" />;
+  if (loading) return <ActivityIndicator className="flex-1" color="#1A1F95" />;
 
   return (
     <View className="flex-1 bg-slate-50 dark:bg-slate-950 px-4">
       {/* Header & Search */}
       <View className="mt-14 mb-4">
-        <Text className="text-3xl font-extrabold text-slate-900 dark:text-white">
-          Study Hub
-        </Text>
+        <View className="flex-row justify-between items-center">
+          <Text className="text-3xl font-extrabold text-slate-900 dark:text-white">
+            Study Hub
+          </Text>
+          <TouchableOpacity
+            onPress={() => handleOpenModal("join")}
+            className="bg-indigo-100 dark:bg-indigo-900/40 px-4 py-2 rounded-full"
+          >
+            <Text className="text-indigo-600 dark:text-indigo-300 font-bold">
+              Join Group
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-        {/* Search Bar */}
         <View className="flex-row items-center bg-white dark:bg-slate-900 mt-4 px-4 py-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <Ionicons name="search" size={20} color="#94a3b8" />
           <TextInput
@@ -156,6 +178,13 @@ export default function Dashboard() {
           <TouchableOpacity
             activeOpacity={0.7}
             className="bg-white dark:bg-slate-900 p-5 rounded-3xl mb-4 border border-slate-100 dark:border-slate-800 shadow-sm flex-row items-center"
+            onPress={() => {
+              // Navigate to dynamic group route passing ID and Name
+              router.push({
+                pathname: "/group/[id]",
+                params: { id: item.id, name: item.name },
+              });
+            }}
           >
             <View className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900 items-center justify-center mr-4">
               <Text className="text-indigo-600 dark:text-indigo-300 font-bold text-lg">
@@ -166,11 +195,8 @@ export default function Dashboard() {
               <Text className="text-lg font-bold text-slate-900 dark:text-white mb-1">
                 {item.name}
               </Text>
-              <Text
-                className="text-slate-500 dark:text-slate-400 text-sm"
-                numberOfLines={1}
-              >
-                {item.description || "Tap to see details"}
+              <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest">
+                Code: {item.invite_code}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
@@ -178,15 +204,13 @@ export default function Dashboard() {
         )}
       />
 
-      {/* Floating Action Button */}
       <TouchableOpacity
-        onPress={handleOpenModal}
+        onPress={() => handleOpenModal("create")}
         className="absolute bottom-10 right-6 bg-indigo-600 w-16 h-16 rounded-full items-center justify-center shadow-xl shadow-indigo-400"
       >
         <Ionicons name="add" size={32} color="white" />
       </TouchableOpacity>
 
-      {/* Apple-style Bottom Sheet */}
       <BottomSheet
         ref={bottomSheetRef}
         index={-1}
@@ -198,60 +222,88 @@ export default function Dashboard() {
       >
         <BottomSheetView className="p-6">
           <Text className="text-2xl font-bold text-slate-900 mb-6 text-center">
-            New Study Group
+            {activeTab === "create" ? "New Study Group" : "Join a Group"}
           </Text>
 
           <View className="gap-y-4">
-            <View>
-              <Text className="text-slate-600 mb-2 font-medium">
-                Group Name
-              </Text>
-              <Controller
-                control={control}
-                name="name"
-                rules={{ required: "Name is required" }}
-                render={({ field: { onChange, value } }) => (
-                  <TextInput
-                    className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-slate-900"
-                    placeholder="e.g. Advanced Calculus"
-                    onChangeText={onChange}
-                    value={value}
+            {activeTab === "create" ? (
+              <>
+                <View>
+                  <Text className="text-slate-600 mb-2 font-medium">
+                    Group Name
+                  </Text>
+                  <Controller
+                    control={control}
+                    name="name"
+                    rules={{ required: "Name is required" }}
+                    render={({ field: { onChange, value } }) => (
+                      <TextInput
+                        className="bg-slate-50 p-4 rounded-2xl border border-slate-200"
+                        placeholder="e.g. Advanced Calculus"
+                        onChangeText={onChange}
+                        value={value}
+                      />
+                    )}
                   />
-                )}
-              />
-              {errors.name && (
-                <Text className="text-red-500 text-xs mt-1">
-                  {errors.name.message}
-                </Text>
-              )}
-            </View>
-
-            <View>
-              <Text className="text-slate-600 mb-2 font-medium">
-                Description
-              </Text>
-              <Controller
-                control={control}
-                name="description"
-                render={({ field: { onChange, value } }) => (
-                  <TextInput
-                    className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-slate-900"
-                    placeholder="What's this group about?"
-                    multiline
-                    numberOfLines={3}
-                    onChangeText={onChange}
-                    value={value}
+                </View>
+                <View>
+                  <Text className="text-slate-600 mb-2 font-medium">
+                    Description
+                  </Text>
+                  <Controller
+                    control={control}
+                    name="description"
+                    render={({ field: { onChange, value } }) => (
+                      <TextInput
+                        className="bg-slate-50 p-4 rounded-2xl border border-slate-200"
+                        placeholder="What's this group about?"
+                        multiline
+                        numberOfLines={3}
+                        onChangeText={onChange}
+                        value={value}
+                      />
+                    )}
                   />
-                )}
-              />
-            </View>
-
-            <TouchableOpacity
-              onPress={handleSubmit(onCreateGroup)}
-              className="bg-indigo-600 p-4 rounded-2xl items-center mt-4 shadow-lg shadow-indigo-200"
-            >
-              <Text className="text-white font-bold text-lg">Create Group</Text>
-            </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  onPress={handleSubmit(onCreateGroup)}
+                  className="bg-indigo-600 p-4 rounded-2xl items-center mt-4"
+                >
+                  <Text className="text-white font-bold text-lg">
+                    Create Group
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <View>
+                  <Text className="text-slate-600 mb-2 font-medium">
+                    Invite Code
+                  </Text>
+                  <Controller
+                    control={control}
+                    name="inviteCode"
+                    rules={{ required: "Code is required" }}
+                    render={({ field: { onChange, value } }) => (
+                      <TextInput
+                        className="bg-slate-50 p-4 rounded-2xl border border-slate-200 uppercase"
+                        placeholder="Enter 6-digit code"
+                        maxLength={6}
+                        autoCapitalize="characters"
+                        onChangeText={onChange}
+                        value={value}
+                      />
+                    )}
+                  />
+                </View>
+                <TouchableOpacity
+                  onPress={handleSubmit(onJoinGroup)}
+                  className="bg-indigo-600 p-4 rounded-2xl items-center mt-4"
+                >
+                  <Text className="text-white font-bold text-lg">Join Now</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </BottomSheetView>
       </BottomSheet>

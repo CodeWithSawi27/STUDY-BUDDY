@@ -6,7 +6,6 @@ export const groupService = {
    */
   createGroup: async (name: string, description: string, userId: string) => {
     try {
-      // 1. Insert the group
       const { data: group, error: groupError } = await supabase
         .from("study_groups")
         .insert([{ name, description, created_by: userId }])
@@ -15,7 +14,6 @@ export const groupService = {
 
       if (groupError) throw groupError;
 
-      // 2. Add creator to group_members table as 'admin'
       const { error: memberError } = await supabase
         .from("group_members")
         .insert([{ group_id: group.id, user_id: userId, role: "admin" }]);
@@ -29,7 +27,38 @@ export const groupService = {
   },
 
   /**
-   * Fetch all groups that the current user is a member of
+   * Join a group using a 6-character invite code
+   */
+  joinGroupByCode: async (inviteCode: string, userId: string) => {
+    try {
+      // 1. Find the group
+      const { data: group, error: fetchError } = await supabase
+        .from("study_groups")
+        .select("id")
+        .eq("invite_code", inviteCode.toUpperCase())
+        .single();
+
+      if (fetchError || !group) throw new Error("Group code not found.");
+
+      // 2. Add member
+      const { error: joinError } = await supabase
+        .from("group_members")
+        .insert([{ group_id: group.id, user_id: userId, role: "member" }]);
+
+      if (joinError) {
+        if (joinError.code === "23505")
+          throw new Error("You are already in this group.");
+        throw joinError;
+      }
+
+      return { group, error: null };
+    } catch (error: any) {
+      return { group: null, error: error.message };
+    }
+  },
+
+  /**
+   * Fetch groups for a user
    */
   getUserGroups: async (userId: string) => {
     const { data, error } = await supabase
@@ -41,6 +70,7 @@ export const groupService = {
           id,
           name,
           description,
+          invite_code,
           created_at
         )
       `,
