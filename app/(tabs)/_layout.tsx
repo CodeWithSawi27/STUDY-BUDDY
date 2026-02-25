@@ -1,7 +1,7 @@
-import { FontAwesome } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { useColorScheme } from "react-native";
-import { Colors } from "../../constants/Colors"; // Ensure this path is correct
+import { CheckSquare, UserCircle, Users } from "lucide-react-native";
+import { Platform, useColorScheme } from "react-native";
+import { Colors } from "../../constants/Colors";
 
 export default function TabsLayout() {
   const colorScheme = useColorScheme() ?? "light";
@@ -10,21 +10,30 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        // Uses Jacksons Purple (primary 500) for the active state
+        // Active state color
         tabBarActiveTintColor: theme.primary[500],
         tabBarInactiveTintColor: theme.text.muted,
         headerShown: false,
+
+        // Fix: 'tabBarHideOnKeyboard' prevents the tab bar from being
+        // pushed up or becoming unresponsive when the keyboard is open.
+        tabBarHideOnKeyboard: true,
+
         tabBarStyle: {
           backgroundColor: theme.background,
           borderTopColor: theme.border,
-          height: 100,
-          paddingBottom: 8,
-          paddingTop: 8,
+          // Fixed Height: 100 was likely too tall and intercepting
+          // screen touches or pushing the hit-box off-screen.
+          height: Platform.OS === "ios" ? 88 : 64,
+          paddingBottom: Platform.OS === "ios" ? 30 : 12,
+          paddingTop: 10,
+          elevation: 0, // Removes shadow on Android for a cleaner look
+          borderTopWidth: 1,
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: "500",
-          paddingBottom: 4,
+          fontWeight: "600",
+          fontFamily: "Montserrat_400Regular", // Using your loaded font
         },
       }}
     >
@@ -32,8 +41,8 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: "Groups",
-          tabBarIcon: ({ color }) => (
-            <FontAwesome name="group" size={24} color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <Users size={size} color={color} strokeWidth={2} />
           ),
         }}
       />
@@ -41,8 +50,8 @@ export default function TabsLayout() {
         name="tasks"
         options={{
           title: "Tasks",
-          tabBarIcon: ({ color }) => (
-            <FontAwesome name="check-square" size={24} color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <CheckSquare size={size} color={color} strokeWidth={2} />
           ),
         }}
       />
@@ -50,8 +59,8 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }) => (
-            <FontAwesome name="user" size={24} color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <UserCircle size={size} color={color} strokeWidth={2} />
           ),
         }}
       />
