@@ -1,8 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 import { Database } from "../types/database";
 
-const supabaseUrl = "https://xeabwfidxdxhqpjsbxmp.supabase.co";
-const supabaseAnonKey =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhlYWJ3ZmlkeGR4aHFwanNieG1wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4OTA0NTYsImV4cCI6MjA4NzQ2NjQ1Nn0.NGRAfD6RRjkuPWq83cb1ORAo4aqF-TjQGfPlHyTXrXs";
+// Use process.env to access variables from your .env file
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || "";
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "";
+
+// Optional: Add a safety check to warn you if keys are missing
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn("Supabase URL or Anon Key is missing. Check your .env file!");
+}
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);

@@ -1,16 +1,43 @@
 import { Redirect } from "expo-router";
-// For now, we will use a placeholder.
-// Later, this should check your Firebase/Supabase session.
+import { onAuthStateChanged, User } from "firebase/auth";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, View } from "react-native";
+import { auth } from "../lib/firebase"; // Ensure this path is correct
 
 export default function Index() {
-  // For testing, set this to true so you can actually see your Dashboard/Tabs
-  const session = true;
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!session) {
-    // If no user is found, redirect to the login screen
+  useEffect(() => {
+    // This listener tells us exactly when a user logs in or out
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+
+    return unsubscribe; // Cleanup listener on unmount
+  }, []);
+
+  if (loading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#F8FAFC",
+        }}
+      >
+        <ActivityIndicator size="large" color="#4F46E5" />
+      </View>
+    );
+  }
+
+  if (!user) {
+    // No user found, send them to Login
     return <Redirect href="/(auth)/login" />;
   }
 
-  // If user is found, redirect to the main dashboard
+  // User exists, send them to the Dashboard
   return <Redirect href="/(tabs)" />;
 }
