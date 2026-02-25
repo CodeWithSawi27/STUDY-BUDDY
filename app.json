@@ -8,6 +8,11 @@
     "scheme": "studybuddy",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "extra": {
+      "eas": {
+        "projectId": "a3cb27cc-8e0a-4d21-a59b-73c22404fdf6"
+      }
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.slimshady.studybuddy"

@@ -14,7 +14,8 @@ export default function GroupLayout() {
         contentStyle: { backgroundColor: theme.background },
       }}
     >
-      <Stack.Screen name="[id]" options={{ headerShown: false }} />
+      {/* The name "[id]" matches your file name app/group/[id].tsx */}
+      <Stack.Screen name="[id]" />
     </Stack>
   );
 }

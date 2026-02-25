@@ -13,6 +13,10 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { CustomSplash } from "../components/ui/SplashScreen";
 import "../global.css";
 
+// Import Auth and Notification Service
+import { auth } from "../lib/firebase";
+import { notificationService } from "../services/notificationService";
+
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -53,6 +57,32 @@ function RootLayoutNav({
 }) {
   const isDark = colorScheme === "dark";
 
+  // --- Push Notification Registration Logic ---
+  useEffect(() => {
+    const setupNotifications = async (userId: string) => {
+      try {
+        const token =
+          await notificationService.registerForPushNotificationsAsync();
+        if (token) {
+          console.log("Push Token Generated:", token);
+          await notificationService.updateUserPushToken(userId, token);
+        }
+      } catch (err) {
+        console.error("Notification setup failed:", err);
+      }
+    };
+
+    // Listen for auth state changes to trigger registration
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        setupNotifications(user.uid);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+  // --------------------------------------------
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style={isDark ? "light" : "dark"} />
@@ -72,7 +102,6 @@ function RootLayoutNav({
           animation: "fade",
         }}
       >
-        {/* The name must exactly match the folder name */}
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen
