@@ -9,12 +9,11 @@ export default function GroupLayout() {
   return (
     <Stack
       screenOptions={{
-        headerShown: false, // This covers all screens in this stack
-        animation: "slide_from_right",
+        headerShown: false,
+        animation: "ios_from_right",
         contentStyle: { backgroundColor: theme.background },
       }}
     >
-      {/* Remove the .tsx extension here */}
       <Stack.Screen name="[id]" options={{ headerShown: false }} />
     </Stack>
   );

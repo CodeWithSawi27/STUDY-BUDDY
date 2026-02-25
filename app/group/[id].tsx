@@ -3,7 +3,9 @@ import BottomSheet, {
   BottomSheetBackdrop,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
+import * as Notifications from "expo-notifications";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, {
   useCallback,
@@ -17,23 +19,43 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Platform,
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  useColorScheme,
 } from "react-native";
+import { Colors } from "../../constants/Colors";
 import { auth } from "../../lib/firebase";
 import { taskService } from "../../services/taskService";
+
+// Configure how notifications appear when app is in foreground
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 export default function GroupDetails() {
   const { id, name } = useLocalSearchParams();
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const theme = isDark ? Colors.dark : Colors.light;
+
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Deadline States
+  const [deadline, setDeadline] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
   // Bottom Sheet Logic
   const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ["50%"], []);
+  const snapPoints = useMemo(() => ["65%"], []); // Increased to fit date picker button
   const renderBackdrop = useCallback(
     (props: any) => (
       <BottomSheetBackdrop
@@ -56,7 +78,18 @@ export default function GroupDetails() {
 
   useEffect(() => {
     fetchTasks();
+    requestPermissions();
   }, [id]);
+
+  const requestPermissions = async () => {
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission Required",
+        "Please enable notifications to receive task reminders.",
+      );
+    }
+  };
 
   const fetchTasks = async () => {
     const { data, error } = await taskService.getGroupTasks(id as string);
@@ -64,14 +97,30 @@ export default function GroupDetails() {
     setLoading(false);
   };
 
+  const scheduleNotification = async (taskTitle: string, taskDate: Date) => {
+    // Schedule for 15 minutes before the deadline
+    const trigger = new Date(taskDate.getTime() - 15 * 60000);
+
+    if (trigger > new Date()) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Upcoming Deadline! ✍️",
+          body: `"${taskTitle}" for ${name} is due in 15 minutes.`,
+          data: { groupId: id },
+        },
+        trigger,
+      });
+    }
+  };
+
   const handleCreateTask = async (data: any) => {
     const userId = auth.currentUser?.uid;
     if (!userId) return;
 
-    const { error } = await taskService.createTask(
+    const { data: newTask, error } = await taskService.createTask(
       data.title,
       data.description,
-      null, // We can add a DatePicker later for deadlines
+      deadline ? deadline.toISOString() : null,
       id as string,
       userId,
     );
@@ -79,9 +128,13 @@ export default function GroupDetails() {
     if (error) {
       Alert.alert("Error", error.message);
     } else {
+      if (deadline) {
+        await scheduleNotification(data.title, deadline);
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       bottomSheetRef.current?.close();
       reset();
+      setDeadline(null);
       fetchTasks();
     }
   };
@@ -95,6 +148,13 @@ export default function GroupDetails() {
           t.id === taskId ? { ...t, is_completed: !currentStatus } : t,
         ),
       );
+    }
+  };
+
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(Platform.OS === "ios");
+    if (selectedDate) {
+      setDeadline(selectedDate);
     }
   };
 
@@ -147,17 +207,38 @@ export default function GroupDetails() {
               >
                 {item.title}
               </Text>
-              {item.description && (
-                <Text className="text-slate-500 text-xs" numberOfLines={1}>
-                  {item.description}
-                </Text>
-              )}
+              <View className="flex-row items-center mt-1">
+                {item.deadline && (
+                  <>
+                    <Ionicons
+                      name="calendar-outline"
+                      size={12}
+                      color="#f59e0b"
+                    />
+                    <Text className="text-amber-600 text-xs font-medium ml-1 mr-3">
+                      {new Date(item.deadline).toLocaleDateString([], {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Text>
+                  </>
+                )}
+                {item.description && (
+                  <Text
+                    className="text-slate-500 text-xs flex-1"
+                    numberOfLines={1}
+                  >
+                    {item.description}
+                  </Text>
+                )}
+              </View>
             </View>
           </View>
         )}
       />
 
-      {/* Floating Add Button */}
       <TouchableOpacity
         onPress={() => bottomSheetRef.current?.expand()}
         className="absolute bottom-10 right-6 bg-indigo-600 w-16 h-16 rounded-full items-center justify-center shadow-xl shadow-indigo-400"
@@ -165,17 +246,21 @@ export default function GroupDetails() {
         <Ionicons name="add" size={32} color="white" />
       </TouchableOpacity>
 
-      {/* Add Task Bottom Sheet */}
       <BottomSheet
         ref={bottomSheetRef}
         index={-1}
         snapPoints={snapPoints}
         enablePanDownToClose
         backdropComponent={renderBackdrop}
-        handleIndicatorStyle={{ backgroundColor: "#cbd5e1" }}
+        handleIndicatorStyle={{
+          backgroundColor: isDark ? "#525252" : "#cbd5e1",
+        }}
+        backgroundStyle={{
+          backgroundColor: isDark ? Colors.dark.card : Colors.light.card,
+        }}
       >
         <BottomSheetView className="p-6">
-          <Text className="text-xl font-bold text-slate-900 mb-4">
+          <Text className="text-xl font-bold text-slate-900 dark:text-white mb-4">
             Add Group Task
           </Text>
           <View className="gap-y-4">
@@ -185,20 +270,54 @@ export default function GroupDetails() {
               rules={{ required: "Task title is required" }}
               render={({ field: { onChange, value } }) => (
                 <TextInput
-                  className="bg-slate-100 p-4 rounded-2xl text-slate-900"
+                  className="bg-slate-100 dark:bg-slate-800 p-4 rounded-2xl text-slate-900 dark:text-white"
                   placeholder="Task Title (e.g. Finish Chapter 1)"
+                  placeholderTextColor={isDark ? "#9CA3AF" : "#64748B"}
                   onChangeText={onChange}
                   value={value}
                 />
               )}
             />
+
+            {/* Deadline Picker Toggle */}
+            <TouchableOpacity
+              onPress={() => setShowDatePicker(true)}
+              className="bg-slate-100 dark:bg-slate-800 p-4 rounded-2xl flex-row items-center justify-between"
+            >
+              <Text
+                className={
+                  deadline
+                    ? "text-indigo-600 dark:text-indigo-400"
+                    : "text-slate-500"
+                }
+              >
+                {deadline ? deadline.toLocaleString() : "Set a Deadline"}
+              </Text>
+              <Ionicons
+                name="time"
+                size={20}
+                color={deadline ? "#4F46E5" : "#64748B"}
+              />
+            </TouchableOpacity>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={deadline || new Date()}
+                mode="datetime"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                onChange={onDateChange}
+                minimumDate={new Date()}
+              />
+            )}
+
             <Controller
               control={control}
               name="description"
               render={({ field: { onChange, value } }) => (
                 <TextInput
-                  className="bg-slate-100 p-4 rounded-2xl text-slate-900"
+                  className="bg-slate-100 dark:bg-slate-800 p-4 rounded-2xl text-slate-900 dark:text-white"
                   placeholder="Optional Description"
+                  placeholderTextColor={isDark ? "#9CA3AF" : "#64748B"}
                   multiline
                   onChangeText={onChange}
                   value={value}

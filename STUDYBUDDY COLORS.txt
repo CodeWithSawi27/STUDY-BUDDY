@@ -1,0 +1,7 @@
+STUDYBUDDY COLORS
+==================
+Dull Black: HSL: 0° 0% 9%
+Hint of Red: HSL: 0° 0% 98%
+Medium Seashell: 0° 0% 95%
+Dull Black: HSL: 0° 0% 9%
+Jacksons Purple: HSL: 239° 70% 34%

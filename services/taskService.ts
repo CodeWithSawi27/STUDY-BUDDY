@@ -15,7 +15,44 @@ export const taskService = {
   },
 
   /**
-   * Create a task (Option B: used within a group view)
+   * Fetch all tasks for all groups the user belongs to.
+   * Joins with study_groups to get the group name for SectionList headers.
+   */
+  getUserTasks: async (userId: string) => {
+    const { data, error } = await supabase
+      .from("tasks")
+      .select(
+        `
+        *,
+        study_groups:group_id (
+          name
+        )
+      `,
+      )
+      .order("created_at", { ascending: false });
+
+    return { data, error };
+  },
+
+  /**
+   * Toggle task completion status
+   */
+  toggleTaskStatus: async (taskId: string, currentStatus: boolean) => {
+    const { error } = await supabase
+      .from("tasks")
+      .update({ is_completed: !currentStatus })
+      .eq("id", taskId);
+
+    return { error };
+  },
+
+  deleteTask: async (taskId: string) => {
+    const { error } = await supabase.from("tasks").delete().eq("id", taskId);
+    return { error };
+  },
+
+  /**
+   * Create a new task within a specific group
    */
   createTask: async (
     title: string,
@@ -39,17 +76,5 @@ export const taskService = {
       .single();
 
     return { data, error };
-  },
-
-  /**
-   * Toggle completion
-   */
-  toggleTaskStatus: async (taskId: string, currentStatus: boolean) => {
-    const { error } = await supabase
-      .from("tasks")
-      .update({ is_completed: !currentStatus })
-      .eq("id", taskId);
-
-    return { error };
   },
 };

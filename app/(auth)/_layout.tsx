@@ -5,7 +5,7 @@ export default function AuthLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        animation: "slide_from_right", // Nice transition between login/register
+        animation: "ios_from_right", // Nice transition between login/register
       }}
     >
       <Stack.Screen name="login" />

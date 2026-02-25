@@ -3,7 +3,8 @@ import { Redirect } from "expo-router";
 // Later, this should check your Firebase/Supabase session.
 
 export default function Index() {
-  const session = null; // Replace with: const { session } = useAuthStore();
+  // For testing, set this to true so you can actually see your Dashboard/Tabs
+  const session = true;
 
   if (!session) {
     // If no user is found, redirect to the login screen
